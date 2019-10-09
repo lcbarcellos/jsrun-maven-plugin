@@ -5,7 +5,7 @@
  */
 package br.ufes.inf.nemo.jsrun;
 
-import static br.ufes.inf.nemo.jsrun.Constants.BASE_DIR;
+import static br.ufes.inf.nemo.jsrun.AnnotationProcessor.JSRUN_CONFIG_FILE;
 import com.google.auto.service.AutoService;
 import java.util.Set;
 import java.util.logging.Logger;
@@ -13,6 +13,7 @@ import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Processor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
+import javax.annotation.processing.SupportedOptions;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.TypeElement;
@@ -23,8 +24,11 @@ import javax.lang.model.element.TypeElement;
  */
 @SupportedAnnotationTypes("*")
 @SupportedSourceVersion(SourceVersion.RELEASE_9)
+@SupportedOptions({JSRUN_CONFIG_FILE})
 @AutoService(Processor.class)
 public class AnnotationProcessor extends AbstractProcessor {
+    
+    public static final String JSRUN_CONFIG_FILE="jsrun.config.file";
 
     Logger log = Logger.getLogger(AnnotationProcessor.class.getName());
     
@@ -33,13 +37,12 @@ public class AnnotationProcessor extends AbstractProcessor {
     @Override
     public boolean process(Set<? extends TypeElement> set, RoundEnvironment re) {
         
-        if (BASE_DIR.isNull()) {
+        String configFile = processingEnv.getOptions().get(JSRUN_CONFIG_FILE);
+        if (configFile == null) {
             log.warning("Maven environment not detected");
         } else {
-            log.severe("Maven environment DETECTED");
+            log.warning("Config file is " + configFile);
         }
-        
-        
         
         return true;
     }

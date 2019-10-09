@@ -1,8 +1,6 @@
 package br.ufes.inf.nemo.jsrun;
 
-import static br.ufes.inf.nemo.jsrun.Constants.BASE_DIR;
-import static br.ufes.inf.nemo.jsrun.Constants.OUTPUT_DIR;
-import org.apache.maven.plugin.AbstractMojo;
+import static br.ufes.inf.nemo.jsrun.AnnotationProcessor.JSRUN_CONFIG_FILE;
 import org.apache.maven.plugin.MojoExecutionException;
 
 import org.apache.maven.plugins.annotations.LifecyclePhase;
@@ -13,26 +11,15 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
-import org.apache.maven.execution.MavenSession;
-import org.apache.maven.plugin.BuildPluginManager;
-import org.apache.maven.plugins.annotations.Component;
-import org.apache.maven.project.MavenProject;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import static org.twdata.maven.mojoexecutor.MojoExecutor.*;
 
 /**
  * Goal which touches a timestamp file.
  */
 @Mojo(name = "process", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
-public class AnnotationMojo extends AbstractMojo {
-
-    @Component
-    private MavenProject mavenProject;
-
-    @Component
-    private MavenSession mavenSession;
-
-    @Component
-    private BuildPluginManager pluginManager;
+public class AnnotationMojo extends AbstractJsRunMojo {
 
     private String groupId;
     private String artifactId;
@@ -43,9 +30,6 @@ public class AnnotationMojo extends AbstractMojo {
      */
     @Parameter(defaultValue = "${project.build.directory}", property = "outputDir", required = true)
     private File outputDirectory;
-
-    @Parameter(defaultValue = "${basedir}", property = "baseDir", required = true, readonly = true)
-    private File baseDir;
     
     private void initVersion() throws MojoExecutionException {
         Properties properties = new Properties();
@@ -61,11 +45,12 @@ public class AnnotationMojo extends AbstractMojo {
 
     @Override
     public void execute() throws MojoExecutionException {
-        BASE_DIR.set(baseDir.getAbsolutePath());
-        OUTPUT_DIR.set(outputDirectory.getAbsolutePath());
         initVersion();
-        
-        new ScriptRunner(mavenProject, mavenSession, pluginManager).run();
+        workDirectory.mkdirs();
+        File configFile = new File(workDirectory, "config.js");
+
+        ConfigWriter.writeConfig(mavenProject, configFile);
+
         executeMojo(
                 plugin(
                         groupId("org.apache.maven.plugins"),
@@ -81,6 +66,13 @@ public class AnnotationMojo extends AbstractMojo {
                                         element("artifactId", artifactId),
                                         element("version", version)
                                 )
+                        ),
+                        element("compilerArgs",
+                                element("arg", new StringBuilder()
+                                        .append("-A")
+                                        .append(JSRUN_CONFIG_FILE)
+                                        .append("=")
+                                        .toString())
                         )
                 ),
                 executionEnvironment(

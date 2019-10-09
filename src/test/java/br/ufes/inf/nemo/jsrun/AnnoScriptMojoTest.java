@@ -1,7 +1,5 @@
 package br.ufes.inf.nemo.jsrun;
 
-import br.ufes.inf.nemo.jsrun.AnnotationMojo;
-import static br.ufes.inf.nemo.jsrun.Constants.BASE_DIR;
 import org.apache.maven.plugin.testing.MojoRule;
 import org.apache.maven.plugin.testing.WithoutMojo;
 

@@ -5,10 +5,18 @@
  */
 package br.ufes.inf.nemo.jsrun;
 
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.MojoFailureException;
+
 /**
  *
  * @author luciano
  */
-public class ScriptRunnerMojo {
+public class ScriptRunnerMojo extends AbstractJsRunMojo {
+
+    @Override
+    public void execute() throws MojoExecutionException, MojoFailureException {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
     
 }
