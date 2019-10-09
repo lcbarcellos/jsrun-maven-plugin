@@ -5,7 +5,6 @@
  */
 package br.ufes.inf.nemo.jsrun;
 
-import static br.ufes.inf.nemo.jsrun.AnnotationProcessor.JSRUN_CONFIG_FILE;
 import com.google.auto.service.AutoService;
 import java.util.Set;
 import java.util.logging.Logger;
@@ -17,6 +16,9 @@ import javax.annotation.processing.SupportedOptions;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.TypeElement;
+import static br.ufes.inf.nemo.jsrun.AnnotationProcessor.JSRUN_PROCESSOR_FILE;
+import java.io.IOException;
+import java.io.InputStream;
 
 /**
  *
@@ -24,26 +26,32 @@ import javax.lang.model.element.TypeElement;
  */
 @SupportedAnnotationTypes("*")
 @SupportedSourceVersion(SourceVersion.RELEASE_9)
-@SupportedOptions({JSRUN_CONFIG_FILE})
+@SupportedOptions({JSRUN_PROCESSOR_FILE})
 @AutoService(Processor.class)
 public class AnnotationProcessor extends AbstractProcessor {
     
-    public static final String JSRUN_CONFIG_FILE="jsrun.config.file";
+    public static final String JSRUN_PROCESSOR_FILE="jsrun.processor.file";
 
     Logger log = Logger.getLogger(AnnotationProcessor.class.getName());
-    
-    
-    
+
     @Override
-    public boolean process(Set<? extends TypeElement> set, RoundEnvironment re) {
-        
-        String configFile = processingEnv.getOptions().get(JSRUN_CONFIG_FILE);
-        if (configFile == null) {
-            log.warning("Maven environment not detected");
-        } else {
-            log.warning("Config file is " + configFile);
+    public boolean process(Set<? extends TypeElement> set, RoundEnvironment re) {        
+        boolean result = false;
+        ScriptRunner scriptRunner = new ScriptRunner();        
+        try {
+            scriptRunner.init();
+            scriptRunner.putProperty("processingEnv", processingEnv);
+            scriptRunner.putProperty("elementSet", set);
+            scriptRunner.putProperty("roundEnvironment", re);
+            scriptRunner.putProperty("log", log);
+            scriptRunner.evaluateResource(getClass(), "init-annotation-processor.js");
+            scriptRunner.evaluateFile(
+                    processingEnv.getOptions().get(JSRUN_PROCESSOR_FILE));
+        } catch (IOException ex) {
+            return true;
+        } finally {
+            scriptRunner.end();
         }
-        
-        return true;
+        return result;
     }
 }

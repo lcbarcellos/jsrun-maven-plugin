@@ -9,6 +9,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.Writer;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Properties;
@@ -34,10 +35,20 @@ public class ConfigWriter {
     public static void writeConfig(MavenProject mavenProject, File file) throws MojoExecutionException {
         try (
                 FileWriter fileWriter = new FileWriter(file);
-                BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);) {
-            JSONWriter jsonWriter = new JSONWriter(fileWriter);
+                BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
+        ) {
+            writeConfig(mavenProject, bufferedWriter);
+        } catch (IOException ex) {
+            throw new MojoExecutionException("Error on creating config file", ex);
+        }
+    }
+    public static void writeConfig(MavenProject mavenProject, Writer writer) throws MojoExecutionException {
+        try {
+            writer.append("setMavenConfig(");
+            JSONWriter jsonWriter = new JSONWriter(writer);
             ConfigWriter configWriter = new ConfigWriter(mavenProject, jsonWriter);
             configWriter.write();
+            writer.append(");");
         } catch (IOException ex) {
             throw new MojoExecutionException("Error on creating config file", ex);
         }

@@ -27,7 +27,7 @@ public class ScriptRunner {
     
     Context context;
     ScriptableObject global;
-    
+
     @FunctionalInterface
     public interface IOSupplier<T> {
         T get() throws IOException;
@@ -39,6 +39,12 @@ public class ScriptRunner {
             context = Context.enter();
             global = context.initStandardObjects();
             ScriptableObject.putProperty(global, "global", global);
+            putProperty("runner", new Object() {
+                public Object runFile(String fileName) throws IOException {
+                    return evaluateFile(new File(fileName));
+                }
+            });
+            context.evaluateString(global, "var runFile = runner.runFile.bind(runner);", "init", 1, null);
         }
     }
     
@@ -58,27 +64,37 @@ public class ScriptRunner {
         putProperty("session", mavenSession);
         putProperty("pluginManager", buildPluginManager);
         
-        try (InputStream stream = getClass().getResourceAsStream("init.js")) {
-            evaluateStream("init.js", stream);
+        try {
+            evaluateResource(getClass(), "init-script-runner.js");
         } catch (IOException ex) {
             throw new MojoFailureException("Error on initializing script engine", ex);
         }
     }
 
-    private void putProperty(String propertyName, Object object) {
+    public void putProperty(String propertyName, Object object) {
         Object jsObject = Context.javaToJS(object, global);
         ScriptableObject.putProperty(global, propertyName, jsObject);
     }
     
-    public void evalulateFile(File file) throws FileNotFoundException, IOException {
+    public Object evaluateFile(File file) throws FileNotFoundException, IOException {
         try (InputStream stream = new FileInputStream(file)) {
-            evaluateStream(file.getName(), stream);
+            return evaluateStream(file.getName(), stream);
         }
     }
-
-    private void evaluateStream(String streamName, InputStream stream) throws IOException {
+    
+    public Object evaluateFile(String fileName) throws IOException {
+        return evaluateFile(new File(fileName));
+    }
+    
+    public Object evaluateStream(String streamName, InputStream stream) throws IOException {
         BufferedReader reader = new BufferedReader(new InputStreamReader(stream));
-        context.evaluateReader(global, reader, streamName, 1, null);
+        return context.evaluateReader(global, reader, streamName, 1, null);
+    }
+
+    public Object evaluateResource(Class<?> clazz, String resourceName) throws IOException {
+        try (InputStream stream = clazz.getResourceAsStream(resourceName)) {
+            return evaluateStream(resourceName, stream);
+        }
     }
     
     public void end() {

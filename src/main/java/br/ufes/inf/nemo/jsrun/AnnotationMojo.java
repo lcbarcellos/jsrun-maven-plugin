@@ -1,6 +1,5 @@
 package br.ufes.inf.nemo.jsrun;
 
-import static br.ufes.inf.nemo.jsrun.AnnotationProcessor.JSRUN_CONFIG_FILE;
 import org.apache.maven.plugin.MojoExecutionException;
 
 import org.apache.maven.plugins.annotations.LifecyclePhase;
@@ -11,9 +10,13 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import static org.twdata.maven.mojoexecutor.MojoExecutor.*;
+import static br.ufes.inf.nemo.jsrun.AnnotationProcessor.JSRUN_PROCESSOR_FILE;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.Writer;
+import org.codehaus.plexus.util.IOUtil;
+import sun.security.util.IOUtils;
 
 /**
  * Goal which touches a timestamp file.
@@ -47,19 +50,27 @@ public class AnnotationMojo extends AbstractJsRunMojo {
     public void execute() throws MojoExecutionException {
         initVersion();
         workDirectory.mkdirs();
-        File configFile = new File(workDirectory, "config.js");
+        File processorFile = new File(workDirectory, "annotation-processor-mojo.js");
+        try (
+                FileWriter fileWriter = new FileWriter(processorFile);
+                Writer writer = new BufferedWriter(fileWriter);
+                InputStream resource = getClass().getResourceAsStream("annotation-processor-mojo.js");
+        ) {
+            IOUtil.copy(resource, writer);
+            ConfigWriter.writeConfig(mavenProject, writer);            
+        } catch (IOException ex) {
+            throw new MojoExecutionException("Error on preparing javascript mojo");
+        }
+        
+        
 
-        ConfigWriter.writeConfig(mavenProject, configFile);
-
-        executeMojo(
-                plugin(
+        executeMojo(plugin(
                         groupId("org.apache.maven.plugins"),
                         artifactId("maven-compiler-plugin"),
                         version("3.8.1")
                 ),
                 goal("compile"),
-                configuration(
-                        element("proc", "only"),
+                configuration(element("proc", "only"),
                         element("annotationProcessorPaths",
                                 element("path",
                                         element("groupId", groupId),
@@ -70,8 +81,9 @@ public class AnnotationMojo extends AbstractJsRunMojo {
                         element("compilerArgs",
                                 element("arg", new StringBuilder()
                                         .append("-A")
-                                        .append(JSRUN_CONFIG_FILE)
+                                        .append(JSRUN_PROCESSOR_FILE)
                                         .append("=")
+                                        .append(processorFile.getAbsolutePath())
                                         .toString())
                         )
                 ),
