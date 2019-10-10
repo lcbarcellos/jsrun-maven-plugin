@@ -36,4 +36,5 @@ public abstract class AbstractJsRunMojo extends AbstractMojo {
     
     @Parameter(defaultValue = "${project.build.directory}/jsrun", property = "workDir", required = true)
     protected File workDirectory;
-}
+}    
+

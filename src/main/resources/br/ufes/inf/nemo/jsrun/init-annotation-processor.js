@@ -1,38 +1,55 @@
 var
-    Packages, processingEnv, roundEnvironment, elementSet
+    Packages, processingEnv, roundEnvironment, elementSet, java
     ;
 
-log.warning("Iniciou init-annotation-processor.js");
-
-function processAnnotations(annotationTypeNames, process) {
+function annotationProcessor(processor) {
+    
     var
         it,
         annotationTypes,
         next
         ;
-    if (typeof annotationTypeNames.map !== "function") {
-        annotationTypeNames = [annotationTypeNames];
+        
+    if (!processor) {
+        return;
+    } else if (typeof processor === "function") {
+        processor = {
+            supportedAnnotationTypes: [ "*" ],
+            process: processor
+        };
+    } else if (processor.constructor === Array) {
+        return processor.forEach(annotationProcessor);
+    } else if (typeof processor.process !== "function") {
+        return annotationProcessor(Object.keys(processor)
+                .filter(function isFunction(key) {
+                    return typeof processor[key] === "function";
+                })
+                .map(function toProcessor(key) {
+                    return { 
+                        supportedAnnotationTypes: [ key ],
+                        process: processor[key]
+                    };
+                })
+            );
     }
-    annotationTypes = annotationTypeNames.map(function map(item) {
-        return Packages[item];
-    }).filter(function filterClasses(item) {
-        return typeof item === "function";
+    processor.supportedAnnotationTypes.forEach(function registerType(annotationType) {
+        annotationProcessor.annotationTypes[annotationType] = true;
     });
-
-    it = roundEnvironment.getElementsAnnotatedWithAny(annotationTypes);
-    while (it.hasNext()) {
-        next = it.next();
-        process(next, annotationTypes.reduce(function (r, annotationType) {
-            r[annotationType.class.name] = next.getAnnotation(annotationType);
-            return r;
-        }, {}));
-    }
+    annotationProcessor.processorList.push(processor);
 }
 
-function processSingleAnnotation(annotationTypeName, process) {
-    processAnnotations([annotationTypeName], function (type, annotations) {
-        process(type, annotations[annotationTypeName]);
-    });
-}
+annotationProcessor.processorList = [];
+annotationProcessor.annotationTypes = {};
+annotationProcessor.getAnnotationTypes = function getAnnotationTypes() {
+    return Object.keys(this.annotationTypes)
+            .reduce(function addToSet(set, value) {
+                return (set.add(java.lang.String.valueOf(set)), set);
+            }, new java.util.HashSet());
+};
+annotationProcessor.process = function process(processor) {
+    processor.process(elementSet, roundEnvironment);
+};
+annotationProcessor.processAll = function processAll() {
+    this.processorList.forEach(annotationProcessor.process);
+};
 
-log.warning("Finalizou init-annotation-processor.js");

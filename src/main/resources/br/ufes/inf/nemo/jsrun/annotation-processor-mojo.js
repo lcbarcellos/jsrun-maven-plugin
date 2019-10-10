@@ -2,6 +2,4 @@ var
     Packages, processingEnv, roundEnvironment, elementSet
     ;
 
-function setMavenConfig(mavenConfig) {
-    
-}
+runner.evaluateFile(mavenConfig.jsRun.annotationProcessor);

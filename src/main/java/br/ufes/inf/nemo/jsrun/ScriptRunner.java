@@ -12,11 +12,15 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.project.MavenProject;
+import org.mozilla.javascript.Callable;
 import org.mozilla.javascript.Context;
+import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
 
 /**
@@ -28,23 +32,18 @@ public class ScriptRunner {
     Context context;
     ScriptableObject global;
 
-    @FunctionalInterface
-    public interface IOSupplier<T> {
-        T get() throws IOException;
-    }
-
     public void init() {
         // create a script engine manager
         if (context == null) {
             context = Context.enter();
             global = context.initStandardObjects();
             ScriptableObject.putProperty(global, "global", global);
-            putProperty("runner", new Object() {
-                public Object runFile(String fileName) throws IOException {
-                    return evaluateFile(new File(fileName));
-                }
-            });
-            context.evaluateString(global, "var runFile = runner.runFile.bind(runner);", "init", 1, null);
+            putProperty("runner", this);
+            try {
+                evaluateResource(getClass(), "init-script-runner.js");
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
         }
     }
     
@@ -63,7 +62,6 @@ public class ScriptRunner {
         putProperty("project", mavenProject);
         putProperty("session", mavenSession);
         putProperty("pluginManager", buildPluginManager);
-        
         try {
             evaluateResource(getClass(), "init-script-runner.js");
         } catch (IOException ex) {
@@ -95,6 +93,14 @@ public class ScriptRunner {
         try (InputStream stream = clazz.getResourceAsStream(resourceName)) {
             return evaluateStream(resourceName, stream);
         }
+    }
+    
+    public Object evaluateString(String scriptName, String scriptSource) {
+        return context.evaluateString(global, scriptSource, scriptName, 1, null);
+    }
+
+    public void enter() {
+        context = Context.enter();
     }
     
     public void end() {

@@ -5,81 +5,92 @@
  */
 package br.ufes.inf.nemo.jsrun;
 
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.Writer;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Properties;
-import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.project.MavenProject;
+import org.json.JSONException;
 import org.json.JSONWriter;
 
 /**
  *
  * @author luciano
  */
-public class ConfigWriter {
+public class ConfigWriter extends JSONWriter {
 
-    private final MavenProject mavenProject;
-
-    private final JSONWriter writer;
-
-    public ConfigWriter(MavenProject mavenProject, JSONWriter writer) {
-        this.mavenProject = mavenProject;
-        this.writer = writer;
-    }
-
-    public static void writeConfig(MavenProject mavenProject, File file) throws MojoExecutionException {
-        try (
-                FileWriter fileWriter = new FileWriter(file);
-                BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
-        ) {
-            writeConfig(mavenProject, bufferedWriter);
-        } catch (IOException ex) {
-            throw new MojoExecutionException("Error on creating config file", ex);
-        }
-    }
-    public static void writeConfig(MavenProject mavenProject, Writer writer) throws MojoExecutionException {
-        try {
-            writer.append("setMavenConfig(");
-            JSONWriter jsonWriter = new JSONWriter(writer);
-            ConfigWriter configWriter = new ConfigWriter(mavenProject, jsonWriter);
-            configWriter.write();
-            writer.append(");");
-        } catch (IOException ex) {
-            throw new MojoExecutionException("Error on creating config file", ex);
-        }
-    }
-
-    public void write() throws MojoExecutionException {
-
-        writer.object()
-            .key("project").object();
-        
-                writeObject(mavenProject);
-                
-                writer.key("build").object();
-                    writeObject(mavenProject.getBuild());
-                writer.endObject()
-                        
-                .key("properties").object();
-                {
-                    Properties properties = mavenProject.getProperties();
-                    for (Object key : properties.keySet()) {
-                        String strKey = key.toString();
-                        writer.key(strKey).value(properties.getProperty(strKey));
-                    }
-                }
-                writer.endObject()
-            .endObject()
-        .endObject();
+    public ConfigWriter(Appendable appendable) {
+        super(appendable);
     }
     
-    public void writeObject(Object object) throws MojoExecutionException {
+    public static ConfigWriter with(Appendable appendable) {
+        return new ConfigWriter(appendable);
+    }
+
+    @Override
+    public ConfigWriter value(Object object) throws JSONException {
+        super.value(object); return this;
+    }
+
+    @Override
+    public ConfigWriter value(long l) throws JSONException {
+        super.value(l); return this;
+    }
+
+    @Override
+    public ConfigWriter value(double d) throws JSONException {
+        super.value(d); return this;
+    }
+
+    @Override
+    public ConfigWriter value(boolean b) throws JSONException {
+        super.value(b); return this;
+    }
+
+    @Override
+    public ConfigWriter object() throws JSONException {
+        super.object(); return this;
+    }
+
+    @Override
+    public ConfigWriter key(String string) throws JSONException {
+        super.key(string); return this;
+    }
+
+    @Override
+    public ConfigWriter endObject() throws JSONException {
+        super.endObject(); return this;
+    }
+
+    @Override
+    public ConfigWriter endArray() throws JSONException {
+        super.endArray(); return this;
+    }
+
+    @Override
+    public ConfigWriter array() throws JSONException {
+        super.array(); return this;
+    }
+    
+    private void properties(Properties properties) {
+        for (Object key : properties.keySet()) {
+            String strKey = key.toString();
+            super.key(strKey).value(properties.getProperty(strKey));
+        }
+    }
+    
+    public ConfigWriter object(Object object) throws JSONException {
+        return object().objectProperties(object).endObject();
+    }
+    
+    public ConfigWriter objectProperties(Object object) throws JSONException {
+        if (object == null) {
+            return this;
+        }
         try {
+            if (object instanceof Properties) {
+                properties((Properties) object);
+                return this;
+            }
             for (Method method : object.getClass().getMethods()) {
                 if (
                         method.getName().startsWith("get") &&
@@ -89,7 +100,6 @@ public class ConfigWriter {
                             method.getName().substring(3, 4).toLowerCase() +
                             method.getName().substring(4);
                     String propertyValue;
-                    
                     
                     if (String.class.isAssignableFrom(method.getReturnType())) {
                         propertyValue = (String) method.invoke(object);
@@ -103,11 +113,12 @@ public class ConfigWriter {
                     } else {
                         continue;
                     }
-                    writer.key(propertyName).value(propertyValue);
+                    key(propertyName).value(propertyValue);
                 }
             }
+            return this;
         } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
-            throw new MojoExecutionException("Error on creating config file", ex);
+            throw new JSONException("Error on writing JSON representation", ex);
         }
     }
 }

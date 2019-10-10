@@ -8,7 +8,7 @@ import static org.junit.Assert.*;
 import org.junit.Test;
 import java.io.File;
 
-public class AnnoScriptMojoTest {
+public class AnnotationMojoTest {
 
     @Rule
     public MojoRule rule = new MojoRule() {
