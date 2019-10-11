@@ -1,8 +1,5 @@
 package br.ufes.inf.nemo.jsrun;
 
-import static br.ufes.inf.nemo.jsrun.Constants.BASE_DIR;
-import static br.ufes.inf.nemo.jsrun.Constants.OUTPUT_DIR;
-import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 
 import org.apache.maven.plugins.annotations.LifecyclePhase;
@@ -13,30 +10,33 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
-import org.apache.maven.execution.MavenSession;
-import org.apache.maven.plugin.BuildPluginManager;
-import org.apache.maven.plugins.annotations.Component;
-import org.apache.maven.project.MavenProject;
 import static org.twdata.maven.mojoexecutor.MojoExecutor.*;
+import static br.ufes.inf.nemo.jsrun.AnnotationProcessor.JSRUN_PROCESSOR_FILE;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.Writer;
+import org.codehaus.plexus.util.IOUtil;
 
 /**
  * Goal which touches a timestamp file.
  */
 @Mojo(name = "process", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
-public class AnnotationMojo extends AbstractMojo {
-
-    @Component
-    private MavenProject mavenProject;
-
-    @Component
-    private MavenSession mavenSession;
-
-    @Component
-    private BuildPluginManager pluginManager;
+public class AnnotationMojo extends AbstractJsRunMojo {
 
     private String groupId;
     private String artifactId;
     private String version;
+
+    @Parameter(
+            defaultValue = "${basedir}/src/build/javascript/annotation-processor.js",
+            property = "annotationProcessor",
+            required = true
+    )
+    protected File annotationProcessor;
+
+    public File getAnnotationProcessor() {
+        return annotationProcessor;
+    }
 
     /**
      * Location of the file.
@@ -44,9 +44,6 @@ public class AnnotationMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project.build.directory}", property = "outputDir", required = true)
     private File outputDirectory;
 
-    @Parameter(defaultValue = "${basedir}", property = "baseDir", required = true, readonly = true)
-    private File baseDir;
-    
     private void initVersion() throws MojoExecutionException {
         Properties properties = new Properties();
         try (InputStream input = getClass().getResourceAsStream("version.properties")) {
@@ -61,33 +58,64 @@ public class AnnotationMojo extends AbstractMojo {
 
     @Override
     public void execute() throws MojoExecutionException {
-        BASE_DIR.set(baseDir.getAbsolutePath());
-        OUTPUT_DIR.set(outputDirectory.getAbsolutePath());
         initVersion();
-        
-        new ScriptRunner(mavenProject, mavenSession, pluginManager).run();
-        executeMojo(
-                plugin(
-                        groupId("org.apache.maven.plugins"),
-                        artifactId("maven-compiler-plugin"),
-                        version("3.8.1")
-                ),
-                goal("compile"),
-                configuration(
-                        element("proc", "only"),
-                        element("annotationProcessorPaths",
-                                element("path",
-                                        element("groupId", groupId),
-                                        element("artifactId", artifactId),
-                                        element("version", version)
-                                )
-                        )
-                ),
-                executionEnvironment(
-                        mavenProject,
-                        mavenSession,
-                        pluginManager
-                )
+        workDirectory.mkdirs();
+        File processorFile = new File(workDirectory, "annotation-processor-mojo.js");
+        try (
+                FileWriter fileWriter = new FileWriter(processorFile);
+                Writer writer = new BufferedWriter(fileWriter);
+                InputStream resource = getClass().getResourceAsStream("annotation-processor-mojo.js");
+        ) {
+            writer.append("mavenConfig = ");
+            ConfigWriter.with(writer)
+                .object()
+                    .key("project").object()
+                        .objectProperties(mavenProject)
+                        .key("build").object(mavenProject.getBuild())
+                        .key("properties").object(mavenProject.getProperties())
+                    .endObject()
+                    .key("jsRun").object(this)
+                .endObject()
+                ;
+            writer.append(";\n");
+
+            IOUtil.copy(resource, writer);
+        } catch (IOException ex) {
+            throw new MojoExecutionException("Error on preparing javascript mojo");
+        }
+        executeAnnotationProcessor(processorFile);
+    }
+
+    private void executeAnnotationProcessor(File processorFile) throws MojoExecutionException {
+
+        executeMojo(plugin(
+                groupId("org.apache.maven.plugins"),
+                artifactId("maven-compiler-plugin"),
+                version("3.8.1")
+            ),
+            goal("compile"),
+            configuration(element("proc", "only"),
+                    element("annotationProcessorPaths",
+                            element("path",
+                                    element("groupId", groupId),
+                                    element("artifactId", artifactId),
+                                    element("version", version)
+                            )
+                    ),
+                    element("compilerArgs",
+                            element("arg", new StringBuilder()
+                                    .append("-A")
+                                    .append(JSRUN_PROCESSOR_FILE)
+                                    .append("=")
+                                    .append(processorFile.getAbsolutePath())
+                                    .toString())
+                    )
+            ),
+            executionEnvironment(
+                    mavenProject,
+                    mavenSession,
+                    pluginManager
+            )
         );
     }
 }
