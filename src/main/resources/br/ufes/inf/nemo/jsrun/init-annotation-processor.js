@@ -1,15 +1,16 @@
 var
-    Packages, processingEnv, roundEnvironment, elementSet, java
+    Packages, processingEnv, roundEnvironment, elementSet, java,
+    annotationTypes = {}, annotatedTypes = []
     ;
 
 function annotationProcessor(processor) {
-    
+
     var
         it,
         annotationTypes,
         next
         ;
-        
+
     if (!processor) {
         return;
     } else if (typeof processor === "function") {
@@ -25,7 +26,7 @@ function annotationProcessor(processor) {
                     return typeof processor[key] === "function";
                 })
                 .map(function toProcessor(key) {
-                    return { 
+                    return {
                         supportedAnnotationTypes: [ key ],
                         process: processor[key]
                     };
@@ -47,9 +48,13 @@ annotationProcessor.getAnnotationTypes = function getAnnotationTypes() {
             }, new java.util.HashSet());
 };
 annotationProcessor.process = function process(processor) {
-    processor.process(elementSet, roundEnvironment);
+    processor.process(annotationTypes, roundEnvironment);
 };
 annotationProcessor.processAll = function processAll() {
+    annotationTypes = annotatedTypes.reduce(function (r, type) {
+        Object.keys(type.annotations).forEach(function (annotationName) {
+            (r[annotationName] = r[annotationName] || []).push(type);
+        });
+    }, {});
     this.processorList.forEach(annotationProcessor.process);
 };
-
